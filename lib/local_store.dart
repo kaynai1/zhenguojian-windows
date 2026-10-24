@@ -1226,12 +1226,14 @@ class LocalStore extends ChangeNotifier {
         : null;
     final previousId = _current;
     final previousLocked = locked;
+    final previousUnlocked = _sourcesUnlocked;
     await preferences.reload();
     _initialize();
     if (_configurationError == null &&
         previousProfiles == _string('profiles') &&
         previousId == _current) {
       _locked = previousLocked;
+      _sourcesUnlocked = previousUnlocked;
     } else {
       _epoch++;
     }

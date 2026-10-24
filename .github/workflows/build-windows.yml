@@ -15,6 +15,25 @@ env:
   GOSUMDB: sum.golang.org
 
 jobs:
+  # 站源密码锁与本地配置的回归用例（Linux runner 便宜，先跑一遍再发版）。
+  gate-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - name: 刷新依赖锁定
+        run: flutter pub get
+      - name: 运行站源密码锁回归测试
+        run: >
+          flutter test
+          test/source_gate_test.dart
+          test/source_gate_reload_test.dart
+
   windows:
     runs-on: windows-latest
     timeout-minutes: 60
