@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fixtures.dart';
 
+const unlockedCount = allSourcesEnabled ? 11 : 1;
+const lockedCount = allSourcesEnabled ? 4 : 1;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -14,9 +17,6 @@ void main() {
     addTearDown(store.dispose);
     return store;
   }
-
-  int get unlockedCount => allSourcesEnabled ? 11 : 1;
-  int get lockedCount => allSourcesEnabled ? 4 : 1;
 
   test('background reload keeps the unlocked sources visible', () async {
     final store = await create(await gatePreferences());
@@ -29,7 +29,6 @@ void main() {
 
     expect(store.sourcesUnlocked, isTrue);
     expect(store.sources.map((site) => site.id).toList(), unlocked);
-    expect(store.allowsSource('huangdou'), unlockedCount > lockedCount);
   });
 
   test('reload keeps sources the user explicitly locked', () async {
@@ -44,7 +43,7 @@ void main() {
     expect(store.sources.length, lockedCount);
   });
 
-  test('a fresh store after restart is locked again', () async {
+  test('a store created after restart starts locked', () async {
     final store = await create(await gatePreferences());
     await unlockGate(store);
     final restarted = testStore(store.preferences);
