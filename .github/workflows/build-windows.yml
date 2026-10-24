@@ -63,6 +63,11 @@ jobs:
           export PATH="/c/mingw64/bin:$PATH"
           gcc --version | head -n1
 
+      # 上游提交的 pubspec.lock 与 pubspec.yaml 不一致（缺 video_player 及子包等 7 项），
+      # 而 build_windows.py 内部使用 --enforce-lockfile，会直接拒绝解析。
+      - name: 刷新依赖锁定
+        run: flutter pub get
+
       - name: 构建真果鉴 Windows x64
         run: python scripts/build_windows.py --all-sources
 
@@ -101,6 +106,6 @@ jobs:
             gh release edit "$tag" --title "真果鉴 Windows ${version}" --notes-file notes.md
           else
             gh release create "$tag" "$archive" dist/windows/SHA256SUMS.txt \
-              --title "真果鉴 Windows ${version}" --notes-file notes.md
+              --title "真果鉴 Windows ${version}" --notes-file notes.md --target winbuild
           fi
           gh release view "$tag" --json assets --jq '.assets[] | "\(.name) \(.size) \(.browser_download_url)"'
