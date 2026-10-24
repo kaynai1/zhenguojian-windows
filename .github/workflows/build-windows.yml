@@ -106,6 +106,6 @@ jobs:
             gh release edit "$tag" --title "真果鉴 Windows ${version}" --notes-file notes.md
           else
             gh release create "$tag" "$archive" dist/windows/SHA256SUMS.txt \
-              --title "真果鉴 Windows ${version}" --notes-file notes.md --target winbuild
+              --title "真果鉴 Windows ${version}" --notes-file notes.md
           fi
           gh release view "$tag" --json assets --jq '.assets[] | "\(.name) \(.size) \(.browser_download_url)"'
