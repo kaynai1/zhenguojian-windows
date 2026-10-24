@@ -1,0 +1,106 @@
+name: Build Windows zhenguojian
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: winbuild-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOPROXY: https://proxy.golang.org,direct
+  GOSUMDB: sum.golang.org
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: native/go.mod
+          cache-dependency-path: native/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+
+      - name: 准备 MinGW-w64（Go cgo 编译 duanju_core.dll 需要）
+        run: |
+          set -euo pipefail
+          if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1; then
+            echo "已有编译器：$(command -v x86_64-w64-mingw32-gcc || command -v gcc)"
+            exit 0
+          fi
+          for candidate in /mingw64/bin /c/mingw64/bin /c/msys64/mingw64/bin /c/Strawberry/c/bin; do
+            if [ -x "$candidate/gcc.exe" ]; then
+              echo "$candidate" >> "$GITHUB_PATH"
+              echo "已在 PATH 中登记：$candidate"
+              exit 0
+            fi
+          done
+          echo "未找到 MinGW-w64，使用 Chocolatey 安装。"
+          choco install mingw --no-progress -y
+          echo "C:/mingw64/bin" >> "$GITHUB_PATH"
+
+      - name: 校验工具链
+        run: |
+          set -euo pipefail
+          python --version
+          go version
+          flutter --version
+          export PATH="/c/mingw64/bin:$PATH"
+          gcc --version | head -n1
+
+      - name: 构建真果鉴 Windows x64
+        run: python scripts/build_windows.py --all-sources
+
+      - name: 产物清单
+        run: |
+          set -euo pipefail
+          ls -la dist/windows
+          cat dist/windows/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zhenguojian-windows-x64
+          path: |
+            dist/windows/*.zip
+            dist/windows/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 发布到 GitHub Release（免登录直链）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1)
+          tag="win-${version//+/-}"
+          archive=$(ls dist/windows/zhenguojian-*-windows-x64.zip | head -n1)
+          checksum=$(sha256sum "$archive" | cut -d' ' -f1)
+          {
+            printf '%s\n\n' "真果鉴（全部站源）Windows 10/11 x64 版本 ${version}。"
+            printf '%s\n' "下载后整包解压，运行 zhenguojian.exe；请保留同目录下的所有 DLL 与 data 文件夹。"
+            printf '%s\n\n' "云端构建机没有音频和图形设备，播放链路未在真实设备上验收。"
+            printf '%s\n' "SHA-256：\`${checksum}\`"
+          } > notes.md
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$archive" dist/windows/SHA256SUMS.txt --clobber
+            gh release edit "$tag" --title "真果鉴 Windows ${version}" --notes-file notes.md
+          else
+            gh release create "$tag" "$archive" dist/windows/SHA256SUMS.txt \
+              --title "真果鉴 Windows ${version}" --notes-file notes.md
+          fi
+          gh release view "$tag" --json assets --jq '.assets[] | "\(.name) \(.size) \(.browser_download_url)"'
